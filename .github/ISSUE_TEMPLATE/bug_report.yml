@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work on your TV or phone
+labels: [bug]
+body:
+  - type: input
+    id: tv
+    attributes:
+      label: TV model
+      placeholder: e.g. TCL 55Q51K, Chromecast with Google TV, Sony X80K
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android TV / Google TV version
+      description: Settings → System → About
+      placeholder: e.g. Android TV OS 12
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown next to the title on the app's setup screen
+      placeholder: e.g. 1.4.0
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and browser
+      placeholder: e.g. Pixel 8, Chrome 131
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. A photo of the TV screen helps.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "Please don't post your Wi-Fi name, the TV's address or the pairing code. For security problems use the Security tab → Report a vulnerability instead."
