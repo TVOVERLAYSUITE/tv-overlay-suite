@@ -148,7 +148,7 @@ same steps with your exact address.
 
 | TV | Android | Version | Result |
 |---|---|---|---|
-| TCL 55Q51K (Google TV) | 12 | 1.3 (private build) | Working |
+| TCL 55Q51K (Google TV) | 12 | 1.4.0 | Working: setup button, pairing, all tabs, re-enable after update |
 
 Tried it on another TV? Please open an issue or a pull request adding a row.
 
