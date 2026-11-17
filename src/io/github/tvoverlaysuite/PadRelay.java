@@ -72,4 +72,7 @@ public final class PadRelay {
     public synchronized String frontLine() { return PadProto.front(front != null, frontName); }
 
     public synchronized String frontName() { return front == null ? null : frontName; }
+
+    /** v1.7: the app in front, or null (only it may open the phone camera). */
+    public synchronized App front() { return front; }
 }

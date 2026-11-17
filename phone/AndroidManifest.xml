@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.github.tvoverlaysuite.remote" android:versionCode="2" android:versionName="1.6.0">
+    package="io.github.tvoverlaysuite.remote" android:versionCode="3" android:versionName="1.7.0">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -15,6 +15,12 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <!-- v1.6: low-latency Wi-Fi while the trackpad is open -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- v1.7: the phone as the TV's camera and microphone for video calls -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <application android:label="TV Overlay Suite" android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false"
         android:usesCleartextTraffic="true" android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
@@ -38,6 +44,9 @@
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize"/>
         <activity android:name=".PadActivity" android:exported="false" android:launchMode="singleTask"
             android:taskAffinity="io.github.tvoverlaysuite.remote.pad" android:label="Trackpad"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"/>
+        <activity android:name=".CamActivity" android:exported="false" android:launchMode="singleTask"
+            android:taskAffinity="io.github.tvoverlaysuite.remote.cam" android:label="Phone camera"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"/>
         <activity android:name=".DrawActivity" android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"/>

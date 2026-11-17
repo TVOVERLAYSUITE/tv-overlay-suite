@@ -36,6 +36,15 @@ final class Store {
     boolean autoPop() { return p.getBoolean("auto", true); }
     void setAutoPop(boolean on) { p.edit().putBoolean("auto", on).apply(); }
 
+    /** v1.7: TV apps (by package) allowed to use this phone's camera and microphone. */
+    boolean camAllowed(String pkg) { return pkg != null && p.getBoolean("cam_" + pkg, false); }
+    void setCamAllowed(String pkg, boolean on) { if (on) p.edit().putBoolean("cam_" + pkg, true).apply(); else p.edit().remove("cam_" + pkg).apply(); }
+    void clearCamAllowed() {
+        android.content.SharedPreferences.Editor e = p.edit();
+        for (String k : p.getAll().keySet()) if (k.startsWith("cam_")) e.remove(k);
+        e.apply();
+    }
+
     /** v1.6: open the trackpad by itself when a trackpad app comes to the front on the TV. */
     boolean padAutoPop() { return p.getBoolean("padAuto", true); }
     void setPadAutoPop(boolean on) { p.edit().putBoolean("padAuto", on).apply(); }

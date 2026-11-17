@@ -653,7 +653,7 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
             si.setServiceType(NSD_TYPE);
             si.setPort(PORT);
             si.setAttribute("id", tvId(this));
-            si.setAttribute("v", "1.6");
+            si.setAttribute("v", "1.7");
             nsdListener = new NsdListener();
             nsd.registerService(si, NsdManager.PROTOCOL_DNS_SD, nsdListener);
         } catch (RuntimeException e) {
@@ -675,6 +675,22 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
         @Override public void onServiceUnregistered(NsdServiceInfo si) { }
     }
 
+    /** v1.7: each phone app's link as a camera relay endpoint (one object per connection). */
+    private final java.util.concurrent.ConcurrentHashMap<InkServer.Client, CamRelay.Phone> camPhones = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private CamRelay.Phone camPhone(InkServer.Client c) {
+        CamRelay.Phone p = camPhones.get(c);
+        if (p == null) {
+            p = c::send;
+            CamRelay.Phone was = camPhones.putIfAbsent(c, p);
+            if (was != null) p = was;
+        }
+        return p;
+    }
+
+    /** Phone apps ready to be the TV's camera (v1.7). */
+    static int camPhones() { return PadService.CAMS.phones(); }
+
     private void kbOpened(InkServer.Client c) {
         c.send(TypeProto.id(tvId(this), tvName(this)));
         c.send(PadService.RELAY.frontLine());
@@ -687,6 +703,11 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
         for (String line : text.split("\n")) {
             if (line.startsWith("P ")) {
                 PadService.RELAY.fromPhone(line.trim());
+                continue;
+            }
+            if (line.startsWith("V ")) {   // v1.7 phone camera set-up
+                PadService.CAMS.fromPhone(camPhone(c), line.trim());
+                if (line.startsWith("V y")) notifyChange();
                 continue;
             }
             TypeProto.Msg m = TypeProto.parse(line.trim());
@@ -731,6 +752,8 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
     @Override
     public void onClose(InkServer.Client c) {
         if (c.kb) {
+            CamRelay.Phone p = camPhones.remove(c);
+            if (p != null) PadService.CAMS.phoneGone(p);
             main.post(() -> { KeysIME k = KeysIME.instance; if (k != null) k.phonesChanged(); notifyChange(); });
             return;
         }

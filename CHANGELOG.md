@@ -2,6 +2,19 @@
 
 This project uses [semantic versioning](https://semver.org/).
 
+## 1.7.0 — the phone as the TV's camera
+
+- **Phone camera for video calls.** A new **Phone camera** screen in the phone app makes the phone the camera and/or
+  microphone of a TV app that supports it (a TV web browser in a Google Meet, Zoom, Jitsi or FaceTime call, for
+  example). It opens by itself when the call starts, asks once per TV app, and sends the camera and sound straight to
+  that app over the home Wi-Fi with WebRTC. Front / back camera, phone-side mute, and Dim for long calls.
+- Only the app in front on the TV can ask; a session belongs to the app and phone that started it, and ends when
+  either goes away. The suite only relays the set-up lines (checked before they are passed on).
+- **For TV apps:** `PadService` takes new `CAM` / `CAM_LINE` messages. See [docs/phone-camera.md](docs/phone-camera.md).
+- The TV setup screen shows how many phones are ready to be a camera. The phone app asks for camera and microphone
+  permission only when it is first used as a camera.
+- New `CamProto` / `CamRelay` with `CamTest`.
+
 ## 1.6.0 — phone trackpad
 
 - **Phone trackpad.** A new Trackpad screen in the phone app drives the pointer of TV apps that support it (a TV web

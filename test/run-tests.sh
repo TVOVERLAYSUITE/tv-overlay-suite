@@ -8,7 +8,7 @@ S=src/io/github/tvoverlaysuite
 javac --release 8 -Xlint:-options -encoding UTF-8 -d $B $S/Ink.java $S/InkServer.java $S/Extras.java $S/Pairing.java \
     $S/Adb.java $S/ServiceList.java test/ExtrasTest.java test/PairingTest.java test/TestHost.java \
     test/AdbProbe.java test/AdbTest.java test/ServiceListProbe.java test/SlowPhoneTest.java \
-    $S/TypeProto.java test/TypeTest.java $S/PadProto.java $S/PadRelay.java test/PadTest.java || exit 1
+    $S/TypeProto.java test/TypeTest.java $S/PadProto.java $S/PadRelay.java test/PadTest.java $S/CamProto.java $S/CamRelay.java test/CamTest.java || exit 1
 fail=0
 java -cp $B ExtrasTest | tail -1 | grep -q "ALL PASS" && echo "PASS ExtrasTest" || { echo "FAIL ExtrasTest"; fail=1; }
 java -cp $B PairingTest > $B/pairing.log || fail=1
@@ -19,6 +19,8 @@ java -cp $B TypeTest > $B/type.log 2>&1 || fail=1
 grep -E "PASS|FAIL" $B/type.log | sed "s/^/TypeTest: /"
 java -cp $B PadTest > $B/pad.log 2>&1 || fail=1
 grep -E "PASS|FAIL" $B/pad.log | sed "s/^/PadTest: /"
+java -cp $B CamTest > $B/cam.log 2>&1 || fail=1
+grep -E "PASS|FAIL" $B/cam.log | sed "s/^/CamTest: /"
 javac --release 8 -Xlint:-options -encoding UTF-8 -cp $B -d $B phone/src/io/github/tvoverlaysuite/remote/WsClient.java \
     test/remote/PhoneLinkTest.java test/remote/PadLinkTest.java || exit 1
 java -cp $B io.github.tvoverlaysuite.remote.PhoneLinkTest > $B/link.log 2>&1 || fail=1

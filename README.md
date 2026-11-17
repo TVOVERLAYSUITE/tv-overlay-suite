@@ -46,6 +46,21 @@ The phone app has a **Trackpad** screen that drives the pointer of TV apps that 
 - **For app developers:** a TV app supports the trackpad by binding to the suite's `PadService`. It takes about 100
   lines; see [docs/trackpad.md](docs/trackpad.md).
 
+### Phone camera for TV video calls (new in 1.7)
+
+The phone app can be the TV's **camera and microphone** for video calls in TV apps that support it (a TV web browser
+on Google Meet, Zoom, Jitsi or FaceTime links, for example):
+
+- **Starts by itself.** When a call starts on the TV, the phone's **Phone camera** screen opens and the camera
+  starts. The first time, the phone asks whether that TV app may use the camera. "Forget camera permissions" in the
+  app takes that back.
+- **Straight over your Wi-Fi.** The video and sound go directly from the phone to the TV app over your home network
+  (WebRTC). The suite only passes along the few lines that set the connection up.
+- **Front or back camera**, a phone-side mute, and **Dim**, which darkens the phone screen during long calls.
+- **Mix and match.** The TV app can take the phone's microphone together with a USB webcam, or the phone's camera
+  together with Bluetooth earbuds.
+- **For app developers:** see [docs/phone-camera.md](docs/phone-camera.md).
+
 ### Overlays
 
 | | |
@@ -101,10 +116,10 @@ The app is not on Google Play yet. Get the APK from the
 **With adb (computer or Termux)**
 ```
 adb connect <tv-ip>:5555
-adb install TV-Overlay-Suite-v1.4.0.apk
+adb install TV-Overlay-Suite-v1.7.0.apk
 ```
 or use [`tools/tvos-install.sh`](tools/tvos-install.sh), which also switches the service on:
-`bash tvos-install.sh <tv-ip> TV-Overlay-Suite-v1.4.0.apk`
+`bash tvos-install.sh <tv-ip> TV-Overlay-Suite-v1.7.0.apk`
 
 Check the download against `SHA256SUMS.txt` in the release, if you like:
 `sha256sum -c SHA256SUMS.txt`
@@ -175,6 +190,9 @@ same steps with your exact address.
   Typing from the phone can't reach those.
 - The phone trackpad only drives TV apps that support it (see [docs/trackpad.md](docs/trackpad.md)). Android doesn't
   let an app move a pointer in other apps, so elsewhere use the remote.
+- The phone camera only works while its screen is open on the phone: Android doesn't let apps use the camera from
+  the background. Keep the phone on a stand during the call. Only TV apps that support it can use it (see
+  [docs/phone-camera.md](docs/phone-camera.md)).
 - "Enable automatically" needs USB debugging on and the classic adb port (5555). Android may restrict on-device adb
   in future versions; the manual method above keeps working.
 
@@ -188,6 +206,9 @@ same steps with your exact address.
   your paired phone apps, never anywhere else, and never sends what's already in a password box. Words you type often
   are kept on the TV for suggestions (never in password boxes).
 - The phone app only talks to the TV you paired it with. It has no analytics and no other network access.
+- The phone app uses the camera and microphone only when a TV app you allowed asks for them, only while its
+  **Phone camera** screen is open (Android shows its camera dot), and sends them only to that TV app on your home
+  network. Only the app on screen on the TV can ask.
 - Photos sent from a phone stay in the TV's memory only while they are shown, and are never saved or uploaded.
   Drawings stay in memory until you clear them or the TV restarts.
 
@@ -202,6 +223,7 @@ same steps with your exact address.
 | After an update the button does nothing | Open the app once; it switches the service back on. If that fails, press **Enable automatically** again. |
 | The typing bar doesn't pop up | In the phone app, check that it says **Connected** and that **Display over other apps** is allowed. On the TV, the setup screen must say **Phone typing: ready**. |
 | The phone says "Set TV Overlay Suite as the TV's keyboard first" | Press **Use as TV keyboard** on the TV's setup screen. |
+| The phone camera doesn't start | On the phone, open **Phone camera** in the app and keep it on screen. Check that the TV's setup screen says **Phone camera: 1 phone ready**, and that the phone allowed the camera and microphone. |
 | Motion mode is greyed out | See [the Chrome setting](#motion-pointing-needs-one-chrome-setting). |
 
 ## Tested on
@@ -226,7 +248,7 @@ phone/build.sh                              # the phone app (same signing variab
 
 Tests:
 ```
-bash test/run-tests.sh            # protocol, pairing, adb client, accessibility-list editing, typing
+bash test/run-tests.sh            # protocol, pairing, adb client, accessibility-list editing, typing, trackpad, camera
 python3 test/e2e.py <chrome-path> # two simulated phones against test/TestHost (see the file header)
 ```
 
@@ -236,6 +258,9 @@ pointer), `InkServer` (HTTP + WebSocket + pairing), `Ink` / `Extras` (protocol, 
 Typing (1.5): `KeysIME` (the TV keyboard; mirrors the open box to phone apps on path `/kb`), `TypeProto` (the typing
 messages and edit logic, shared with the phone app), and `phone/` (the phone app: `LinkService` keeps the
 connection, `TypePanel` sends each edit, `TypingBar` is the floating window).
+Trackpad (1.6): `PadService` / `PadRelay` / `PadProto` (see [docs/trackpad.md](docs/trackpad.md)).
+Phone camera (1.7): `CamRelay` / `CamProto` on the TV, and the phone app's `CamActivity` with its WebRTC page
+`phone/assets/cam/index.html` (see [docs/phone-camera.md](docs/phone-camera.md)).
 
 ## License
 

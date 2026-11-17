@@ -115,7 +115,7 @@ public class MainActivity extends Activity {
 
         TextView h = text("TV Overlay Suite", 26, TEXT, true);
         col.addView(h);
-        TextView sub = text("Type on your TV from this phone, use it as a trackpad, and draw, point and send to the screen.", 15, MUTED, false);
+        TextView sub = text("Type on your TV from this phone, use it as a trackpad or as the TV's camera, and draw, point and send to the screen.", 15, MUTED, false);
         sub.setPadding(0, px(4), 0, px(16));
         col.addView(sub);
 
@@ -190,6 +190,9 @@ public class MainActivity extends Activity {
         TextView padBtn = button("Trackpad", true);
         padBtn.setOnClickListener(v -> startActivity(new Intent(this, PadActivity.class)));
         readyCard.addView(padBtn);
+        TextView camBtn = button("Phone camera for TV video calls", true);
+        camBtn.setOnClickListener(v -> startActivity(new Intent(this, CamActivity.class)));
+        readyCard.addView(camBtn);
         TextView draw = button("Draw, laser, messages, photo, dimmer", false);
         draw.setOnClickListener(v -> startActivity(new Intent(this, DrawActivity.class)));
         readyCard.addView(draw);
@@ -218,6 +221,12 @@ public class MainActivity extends Activity {
                 + "The connection notification has Type on TV and Trackpad buttons too.", 13, MUTED, false);
         tip.setPadding(0, px(10), 0, 0);
         readyCard.addView(tip);
+        TextView forgetCam = button("Forget camera permissions", false);
+        forgetCam.setOnClickListener(v -> {
+            store.clearCamAllowed();
+            android.widget.Toast.makeText(this, "TV apps will ask again before using the camera", android.widget.Toast.LENGTH_SHORT).show();
+        });
+        readyCard.addView(forgetCam);
         TextView forget = button("Forget this TV", false);
         forget.setOnClickListener(v -> {
             store.forget();

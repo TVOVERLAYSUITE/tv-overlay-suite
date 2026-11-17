@@ -329,6 +329,8 @@ public class SetupActivity extends Activity {
             padLine.setText(front != null ? "Phone trackpad: drives " + (front.isEmpty() ? "the app in front" : front)
                     : padApps > 0 ? "Phone trackpad: ready (works in " + (padApps == 1 ? "1 app" : padApps + " apps") + " on this TV)"
                     : "Phone trackpad: no app on this TV supports it yet");
+            int cams = MarkerService.camPhones();
+            padLine.setText(padLine.getText() + "\nPhone camera: " + (cams == 0 ? "no phone app ready" : cams == 1 ? "1 phone ready" : cams + " phones ready"));
             btnKb.setVisibility(kbOn ? View.GONE : View.VISIBLE);
             hint.setText("Short press: show / hide the marker layer, then draw on your phone (the drawing stays until you clear it). "
                     + "Long press (about 1 second): night dimmer off and photo removed. "

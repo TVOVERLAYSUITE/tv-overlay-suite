@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import io.github.tvoverlaysuite.CamProto;
 import io.github.tvoverlaysuite.PadProto;
 import io.github.tvoverlaysuite.TypeProto;
 
@@ -79,6 +80,12 @@ public class LinkService extends Service {
     /** PadActivity while it is on screen. Main thread. */
     PadActivity padActivity;
 
+    /** v1.7: CamActivity while it exists (the phone as the TV's camera). Main thread. */
+    CamActivity camActivity;
+    /** Camera requests waiting for CamActivity to start. Main thread. */
+    final ArrayList<String> camPending = new ArrayList<>();
+    private static final int NOTE_CAM = 3;
+
     static void start(Context c) {
         Intent i = new Intent(c, LinkService.class).setAction(ACTION_KICK);
         try {
@@ -101,6 +108,9 @@ public class LinkService extends Service {
             NotificationChannel type = new NotificationChannel("type", "Text box opened on the TV", NotificationManager.IMPORTANCE_HIGH);
             type.setShowBadge(false);
             nm.createNotificationChannel(type);
+            NotificationChannel cam = new NotificationChannel("cam", "TV asks for the phone camera", NotificationManager.IMPORTANCE_HIGH);
+            cam.setShowBadge(false);
+            nm.createNotificationChannel(cam);
         }
         goForeground();
         instance = this;
@@ -201,7 +211,7 @@ public class LinkService extends Service {
             }
             Runnable r = onStatus;
             if (r != null) r.run();
-            if (s != S_CONNECTED) { fieldOpen = false; bar.hide(); padState(false, padName); }
+            if (s != S_CONNECTED) { fieldOpen = false; bar.hide(); padState(false, padName); camLinkLost(); }
         });
     }
 
@@ -260,6 +270,7 @@ public class LinkService extends Service {
             c.setReadTimeout((int) (PING_MS * 2 + 5000));
             ws = c;
             setStatus(S_CONNECTED);
+            sendLine(CamProto.ready());   // v1.7: this phone can be the TV's camera
             try {
                 while (running && c.isOpen()) {
                     String t = c.readText();
@@ -267,6 +278,11 @@ public class LinkService extends Service {
                         if (line.startsWith("P ")) {
                             PadProto.Front f = PadProto.parseFront(line.trim());
                             if (f != null) main.post(() -> padFront(f));
+                            continue;
+                        }
+                        if (line.startsWith("V ")) {
+                            String cl = line.trim();
+                            main.post(() -> camFromTv(cl));
                             continue;
                         }
                         TypeProto.Msg m = TypeProto.parse(line.trim());
@@ -473,6 +489,53 @@ public class LinkService extends Service {
         padName = name == null ? "" : name;
         if (on) store.setPadApp(padName);
         if (padActivity != null) padActivity.front(on, padName);
+    }
+
+    // ---------------------------------------------------------------- phone camera (v1.7, main thread)
+
+    private void camFromTv(String line) {
+        CamProto.Msg m = CamProto.parseForPhone(line);
+        if (m == null) return;
+        if (camActivity != null) { camActivity.fromTv(line); return; }
+        if (m.kind != 'o') {
+            if (m.kind != 'x') sendLine("V x " + m.sid);   // nothing running here: stop it on the TV
+            return;
+        }
+        camPending.add(line);
+        while (camPending.size() > 4) camPending.remove(0);
+        sendLine(CamProto.state(m.sid, "wait", null));   // the TV waits longer while the phone gets ready
+        Intent i = new Intent(this, CamActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        boolean started = false;
+        // Starting a screen from the background needs "Display over other apps" (already asked for the typing bar).
+        if (TypingBar.allowed(this) && screenOn) {
+            try { startActivity(i); started = true; } catch (RuntimeException ignored) { }
+        }
+        if (!started) camNote(m.name);
+    }
+
+    /** The TV asked for the camera but the screen couldn't open by itself: a notification opens it. */
+    private void camNote(String app) {
+        PendingIntent pi = PendingIntent.getActivity(this, 5,
+                new Intent(this, CamActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, "cam") : new Notification.Builder(this);
+        b.setSmallIcon(R.drawable.ic_note)
+                .setContentTitle((app == null || app.isEmpty() ? "An app" : app) + " on the TV wants this phone's camera")
+                .setContentText("Tap to start the phone camera for the call")
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setCategory(Notification.CATEGORY_CALL)
+                .setPriority(Notification.PRIORITY_HIGH);
+        try { getSystemService(NotificationManager.class).notify(NOTE_CAM, b.build()); } catch (RuntimeException ignored) { }
+    }
+
+    void camNoteClear() {
+        try { getSystemService(NotificationManager.class).cancel(NOTE_CAM); } catch (RuntimeException ignored) { }
+    }
+
+    private void camLinkLost() {
+        camPending.clear();
+        if (camActivity != null) camActivity.linkLost();
     }
 
     // ---------------------------------------------------------------- receivers (named classes: d8 bug)

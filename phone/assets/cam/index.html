@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Phone camera</title>
+<style>
+  :root { --bg:#0F1218; --field:#252B38; --text:#E9ECF2; --muted:#8A93A3; --accent:#FFE135; --good:#45D483; --warn:#FF8A5F; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.35 sans-serif; overflow: hidden; }
+  #wrap { display: flex; flex-direction: column; height: 100%; padding: 12px 12px 14px; gap: 10px; }
+  #top { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
+  #dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; }
+  #dot.live { background: var(--good); box-shadow: 0 0 0 4px rgba(69,212,131,.18); }
+  #dot.wait { background: var(--accent); }
+  #dot.bad { background: var(--warn); }
+  #title { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sub { color: var(--muted); font-size: 13px; }
+  #stage { position: relative; flex: 1; border-radius: 22px; overflow: hidden; background: #1B202A; }
+  video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  video.mirror { transform: scaleX(-1); }
+  #idle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          text-align: center; padding: 28px; color: var(--muted); gap: 10px; }
+  #idle b { color: var(--text); font-size: 17px; }
+  #keys { display: flex; gap: 6px; }
+  .k { flex: 1; background: var(--field); color: var(--text); border: 0; border-radius: 14px; padding: 10px 0 9px;
+       font: 600 13px sans-serif; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .k span { font-size: 19px; line-height: 1; }
+  .k.on { background: var(--accent); color: #15181E; }
+  .k.stop { background: #3A2326; color: #FFB4A6; }
+  .k:disabled { opacity: .45; }
+  #shade { position: fixed; inset: 0; background: #000; display: none; align-items: flex-end; justify-content: center;
+           padding-bottom: 40px; color: #555; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="top">
+    <div id="dot"></div>
+    <div style="min-width:0">
+      <div id="title">Phone camera</div>
+      <div id="sub">Waiting for a video call on the TV</div>
+    </div>
+  </div>
+  <div id="stage">
+    <video id="me" autoplay muted playsinline class="mirror"></video>
+    <div id="idle">
+      <b>Ready to be the TV's camera</b>
+      <div>Start or join a video call in a TV app that supports the phone camera (a TV web browser, for example). The camera starts here by itself.</div>
+      <div>Keep this screen open during the call. “Dim” darkens it to save battery.</div>
+    </div>
+  </div>
+  <div id="keys">
+    <button class="k" id="flip" disabled><span>⟲</span>Flip</button>
+    <button class="k" id="mic" disabled><span>🎙</span>Mic on</button>
+    <button class="k" id="dim"><span>☾</span>Dim</button>
+    <button class="k stop" id="stop"><span>✕</span>Close</button>
+  </div>
+</div>
+<div id="shade">Tap to light the screen again</div>
+<script>
+(function () {
+  'use strict';
+  var N = window.TvosCam;
+  var $ = function (id) { return document.getElementById(id); };
+  var S = {};                       // sid -> {pc, media, live}
+  var local = { v: null, a: null }; // the phone's own camera / microphone tracks
+  var facing = 'u', micOn = true, idleTimer = 0, busy = Promise.resolve();
+  var tv = 'the TV';
+  try { tv = N.tvName(); } catch (e) {}
+
+  function send(line) { try { N.send(line); } catch (e) {} }
+  function b64(s) {
+    var bytes = new TextEncoder().encode(s), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function unb64(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+  function alive(t) { return t && t.readyState === 'live'; }
+  function count() { return Object.keys(S).length; }
+
+  function status(kind, title, sub) {
+    $('dot').className = kind || '';
+    $('title').textContent = title;
+    $('sub').textContent = sub || '';
+  }
+
+  function refresh() {
+    var n = count(), any = false, v = false, a = false;
+    Object.keys(S).forEach(function (k) { if (S[k].live) any = true; if (S[k].media.indexOf('v') >= 0) v = true; if (S[k].media.indexOf('a') >= 0) a = true; });
+    $('idle').style.display = alive(local.v) ? 'none' : 'flex';
+    $('flip').disabled = !alive(local.v);
+    $('mic').disabled = !alive(local.a);
+    $('mic').className = 'k' + (alive(local.a) && !micOn ? ' on' : '');
+    $('mic').lastChild.textContent = micOn ? 'Mic on' : 'Mic off';
+    $('me').className = facing === 'u' ? 'mirror' : '';
+    if (!n) { status('', 'Phone camera', 'Waiting for a video call on ' + tv); return; }
+    var what = (v && a) ? 'Camera and microphone' : v ? 'Camera' : 'Microphone';
+    if (any) status('live', what + ' → ' + tv, micOn ? 'Live over Wi-Fi · keep this screen open' : 'Live · microphone muted on the phone');
+    else status('wait', 'Connecting to ' + tv + '…', what);
+  }
+
+  // ---------------------------------------------------------------- camera / microphone
+
+  function videoConstraints() {
+    return { facingMode: facing === 'e' ? 'environment' : 'user', width: { ideal: 1280 }, height: { ideal: 720 },
+             frameRate: { ideal: 30, max: 30 } };
+  }
+
+  /** Makes sure the tracks a session needs are running; opens only what is missing. */
+  function ensure(media) {
+    var c = {};
+    if (media.indexOf('v') >= 0 && !alive(local.v)) c.video = videoConstraints();
+    if (media.indexOf('a') >= 0 && !alive(local.a)) c.audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    if (!c.video && !c.audio) return Promise.resolve();
+    return navigator.mediaDevices.getUserMedia(c).then(function (s) {
+      s.getVideoTracks().forEach(function (t) { local.v = t; t.contentHint = 'motion'; t.onended = lostTrack; });
+      s.getAudioTracks().forEach(function (t) { local.a = t; t.enabled = micOn; t.onended = lostTrack; });
+      if (local.v) $('me').srcObject = new MediaStream([local.v]);
+      refresh();
+    });
+  }
+
+  function lostTrack() {
+    // Android took the camera away (this screen left the front, or another app opened it)
+    Object.keys(S).forEach(function (sid) { end(sid, true); });
+    status('bad', 'The camera stopped', 'Keep this screen open during the call');
+  }
+
+  function releaseIfIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      if (count()) return;
+      if (local.v) { local.v.onended = null; local.v.stop(); local.v = null; }
+      if (local.a) { local.a.onended = null; local.a.stop(); local.a = null; }
+      $('me').srcObject = null;
+      refresh();
+    }, 4000);
+  }
+
+  // ---------------------------------------------------------------- sessions
+
+  function gathered(pc) {
+    return new Promise(function (res) {
+      if (pc.iceGatheringState === 'complete') return res();
+      var t = setTimeout(res, 1500);
+      pc.addEventListener('icegatheringstatechange', function () {
+        if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
+      });
+    });
+  }
+
+  function open(sid, media, face) {
+    if (S[sid]) return;
+    clearTimeout(idleTimer);
+    if (!alive(local.v)) facing = face;
+    var s = S[sid] = { pc: null, media: media, live: false };
+    refresh();
+    // one at a time: two requests at once must not open the camera twice
+    busy = busy.then(function () {
+      if (!S[sid]) return;
+      return ensure(media).then(function () {
+        if (!S[sid]) return;
+        var pc = s.pc = new RTCPeerConnection({ iceServers: [] });
+        var tracks = [];
+        if (media.indexOf('v') >= 0 && local.v) tracks.push(local.v);
+        if (media.indexOf('a') >= 0 && local.a) tracks.push(local.a);
+        var stream = new MediaStream(tracks);
+        tracks.forEach(function (t) { pc.addTrack(t, stream); });
+        pc.oniceconnectionstatechange = function () {
+          var st = pc.iceConnectionState;
+          if ((st === 'connected' || st === 'completed') && !s.live) { s.live = true; send('V h ' + sid + ' live'); refresh(); }
+          else if (st === 'failed') { send('V h ' + sid + ' err ' + b64('Could not reach the TV over Wi-Fi')); end(sid, true); }
+        };
+        return pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
+          .then(function () { return gathered(pc); })
+          .then(function () {
+            if (!S[sid]) return;
+            send('V s ' + sid + ' ' + b64(pc.localDescription.sdp));
+            // a sharp picture without flooding the Wi-Fi (and the TV's decoder)
+            pc.getSenders().forEach(function (sn) {
+              if (!sn.track || sn.track.kind !== 'video') return;
+              var p = sn.getParameters();
+              if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+              p.encodings[0].maxBitrate = 2500000;
+              p.encodings[0].maxFramerate = 30;
+              p.degradationPreference = 'maintain-framerate';
+              sn.setParameters(p).catch(function () {});
+            });
+          });
+      });
+    }).catch(function (e) {
+      var why = (e && e.name === 'NotAllowedError') ? 'Camera permission refused on the phone' : ('Phone camera: ' + (e && e.message || e));
+      send('V h ' + sid + ' ' + (e && e.name === 'NotAllowedError' ? 'deny' : 'err') + ' ' + b64(why.slice(0, 180)));
+      end(sid, true);
+      status('bad', 'The camera could not start', why);
+    });
+  }
+
+  function answer(sid, sdp) {
+    var s = S[sid];
+    if (!s || !s.pc) return;
+    s.pc.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function (e) {
+      send('V h ' + sid + ' err ' + b64('Bad answer from the TV'));
+      end(sid, true);
+    });
+  }
+
+  function end(sid, tell) {
+    var s = S[sid];
+    if (!s) return;
+    delete S[sid];
+    try { if (s.pc) s.pc.close(); } catch (e) {}
+    if (tell) send('V x ' + sid);
+    refresh();
+    if (!count()) releaseIfIdle();
+  }
+
+  function flip(to) {
+    if (!alive(local.v)) { facing = to || (facing === 'u' ? 'e' : 'u'); return; }
+    var want = to || (facing === 'u' ? 'e' : 'u');
+    if (want === facing) return;
+    var old = local.v;
+    facing = want;
+    // most phones can't run both cameras at once: stop the old one first
+    old.onended = null;
+    old.stop();
+    busy = busy.then(function () {
+      return navigator.mediaDevices.getUserMedia({ video: videoConstraints() }).then(function (st) {
+        var t = st.getVideoTracks()[0];
+        t.contentHint = 'motion';
+        t.onended = lostTrack;
+        local.v = t;
+        $('me').srcObject = new MediaStream([t]);
+        Object.keys(S).forEach(function (sid) {
+          var pc = S[sid].pc;
+          if (!pc) return;
+          pc.getSenders().forEach(function (sn) { if (sn.track && sn.track.kind === 'video') sn.replaceTrack(t).catch(function () {}); });
+        });
+        refresh();
+      });
+    }).catch(function () { lostTrack(); });
+  }
+
+  // ---------------------------------------------------------------- from the app
+
+  window.cam = {
+    fromTv: function (line) {
+      var a = String(line).split(' ');
+      if (a[0] !== 'V' || a.length < 3) return;
+      var k = a[1], sid = a[2];
+      if (k === 'o' && a.length >= 5) open(sid, a[3] === 'av' ? 'va' : a[3], a[4]);
+      else if (k === 's' && a.length === 4) answer(sid, unb64(a[3]));
+      else if (k === 'f' && a.length === 4) flip(a[3]);
+      else if (k === 'x') end(sid, false);
+    },
+    linkLost: function () {
+      Object.keys(S).forEach(function (sid) { end(sid, false); });
+      status('bad', 'Lost the connection to ' + tv, 'It comes back by itself when the TV is reachable');
+    },
+    stopAll: function (tell) { Object.keys(S).forEach(function (sid) { end(sid, tell !== false); }); }
+  };
+
+  $('flip').onclick = function () { flip(); };
+  $('mic').onclick = function () { micOn = !micOn; if (local.a) local.a.enabled = micOn; refresh(); };
+  $('dim').onclick = function () { $('shade').style.display = 'flex'; try { N.dim(true); } catch (e) {} };
+  $('shade').onclick = function () { $('shade').style.display = 'none'; try { N.dim(false); } catch (e) {} };
+  $('stop').onclick = function () { window.cam.stopAll(true); try { N.close(); } catch (e) {} };
+
+  refresh();
+  try { N.ready(); } catch (e) {}
+})();
+</script>
+</body>
+</html>
