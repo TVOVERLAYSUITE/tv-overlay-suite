@@ -31,6 +31,21 @@ The suite now includes its own TV keyboard (a fast on-screen QWERTY for the remo
 - **Finds the TV by itself** after the TV's Wi-Fi address changes, and goes quiet a minute after your phone's screen
   turns off.
 
+### Phone trackpad (new in 1.6)
+
+The phone app has a **Trackpad** screen that drives the pointer of TV apps that support it, such as a TV web browser:
+
+- **Feels like a laptop trackpad.** Slide to move: slow moves stay precise, quick flicks cross the screen. Tap to
+  click, two fingers to scroll (with momentum), two-finger tap or hold still for the app's menu, and tap then touch
+  again and slide to drag (seek bars, sliders). Back, Home, Menu, Play/Pause and Type buttons sit under the pad.
+- **Fast.** Every finger move goes to the TV the moment it happens, on the same direct Wi-Fi link as typing. Moves that
+  pile up during a Wi-Fi hiccup are added together instead of queuing, so the pointer never lags behind. While the
+  trackpad is open the phone keeps its Wi-Fi out of power-saving mode.
+- **Opens by itself** when a supporting app comes to the front on the TV (you can turn that off), or from the app and
+  its notification. Speed is adjustable in the app.
+- **For app developers:** a TV app supports the trackpad by binding to the suite's `PadService`. It takes about 100
+  lines; see [docs/trackpad.md](docs/trackpad.md).
+
 ### Overlays
 
 | | |
@@ -158,6 +173,8 @@ same steps with your exact address.
   example) is selected, the phone can't type into the TV.
 - A few apps draw their own on-screen keyboard instead of using the TV's keyboard (some game and streaming apps).
   Typing from the phone can't reach those.
+- The phone trackpad only drives TV apps that support it (see [docs/trackpad.md](docs/trackpad.md)). Android doesn't
+  let an app move a pointer in other apps, so elsewhere use the remote.
 - "Enable automatically" needs USB debugging on and the classic adb port (5555). Android may restrict on-device adb
   in future versions; the manual method above keeps working.
 

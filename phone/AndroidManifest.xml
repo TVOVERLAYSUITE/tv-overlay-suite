@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.github.tvoverlaysuite.remote" android:versionCode="1" android:versionName="1.5.0">
+    package="io.github.tvoverlaysuite.remote" android:versionCode="2" android:versionName="1.6.0">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- v1.6: low-latency Wi-Fi while the trackpad is open -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application android:label="TV Overlay Suite" android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false"
         android:usesCleartextTraffic="true" android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
@@ -34,6 +36,9 @@
             android:taskAffinity="io.github.tvoverlaysuite.remote.type" android:launchMode="singleTask"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize"/>
+        <activity android:name=".PadActivity" android:exported="false" android:launchMode="singleTask"
+            android:taskAffinity="io.github.tvoverlaysuite.remote.pad" android:label="Trackpad"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"/>
         <activity android:name=".DrawActivity" android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"/>
         <service android:name=".LinkService" android:exported="false"

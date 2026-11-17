@@ -2,6 +2,19 @@
 
 This project uses [semantic versioning](https://semver.org/).
 
+## 1.6.0 — phone trackpad
+
+- **Phone trackpad.** A new Trackpad screen in the phone app drives the pointer of TV apps that support it (a TV web
+  browser, for example). Pointer acceleration, tap to click, two-finger scroll with momentum, two-finger tap or hold
+  for the menu, tap-then-slide to drag, and Back / Home / Menu / Play / Type buttons. It opens by itself when such an
+  app comes to the front on the TV (a switch turns that off) and has a speed setting.
+- Moves use the phone app's existing typing link and are sent the instant the finger moves; a backlog is merged into one
+  move instead of queuing. The phone keeps Wi-Fi out of power saving while the trackpad is open.
+- **For TV apps:** new exported `PadService` (Android `Messenger` messages) that hands the trackpad to the app in front.
+  See [docs/trackpad.md](docs/trackpad.md).
+- The TV setup screen shows the trackpad's state; the phone app's notification gets a **Trackpad** button.
+- Swipes starting at the phone's screen edge stay on the trackpad instead of triggering Android's Back gesture.
+
 ## 1.5.0 — type from your phone
 
 - **Type on the TV from your phone.** A new phone app pops up a typing bar when a text box opens on the TV, and every

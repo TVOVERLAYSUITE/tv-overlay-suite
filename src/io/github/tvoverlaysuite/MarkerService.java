@@ -607,6 +607,19 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
         if (s != null && s.server != null) s.server.broadcastKb(msg);
     }
 
+    /** v1.6: a trackpad app came to the front or left it: tell every phone app (and the setup screen). */
+    static void padToPhones(String line) {
+        sendKb(line);
+        MarkerService s = instance;
+        if (s != null) s.notifyChange();
+    }
+
+    /** The trackpad app in front on the TV, or null. */
+    static String padFront() { return PadService.RELAY.frontName(); }
+
+    /** Apps on the TV connected for the trackpad. */
+    static int padApps() { return PadService.apps(); }
+
     /** Phone apps connected for typing. */
     static int kbPhones() {
         MarkerService s = instance;
@@ -640,7 +653,7 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
             si.setServiceType(NSD_TYPE);
             si.setPort(PORT);
             si.setAttribute("id", tvId(this));
-            si.setAttribute("v", "1.5");
+            si.setAttribute("v", "1.6");
             nsdListener = new NsdListener();
             nsd.registerService(si, NsdManager.PROTOCOL_DNS_SD, nsdListener);
         } catch (RuntimeException e) {
@@ -664,12 +677,18 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
 
     private void kbOpened(InkServer.Client c) {
         c.send(TypeProto.id(tvId(this), tvName(this)));
+        c.send(PadService.RELAY.frontLine());
         main.post(() -> { KeysIME k = KeysIME.instance; if (k != null) k.phonesChanged(); notifyChange(); });
     }
 
-    /** Network thread: typing lines from a phone app go to the keyboard on the main thread. */
+    /** Network thread: typing lines from a phone app go to the keyboard on the main thread; trackpad lines go
+     *  straight to the trackpad app from this thread (no main-thread hop, for the lowest delay). */
     private void kbText(InkServer.Client c, String text) {
         for (String line : text.split("\n")) {
+            if (line.startsWith("P ")) {
+                PadService.RELAY.fromPhone(line.trim());
+                continue;
+            }
             TypeProto.Msg m = TypeProto.parse(line.trim());
             if (m == null) continue;
             main.post(() -> {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Phone app: same no-Gradle pipeline as the TV app. Compiles the shared TypeProto.java from ../src.
+# Phone app: same no-Gradle pipeline as the TV app. Compiles the shared TypeProto.java and PadProto.java from ../src.
 # Output: build/TV-Overlay-Suite-Phone-v<versionName>.apk. Signing: same TVOS_KEYSTORE / TVOS_KS_PASS as the TV app.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -14,7 +14,7 @@ rm -rf build && mkdir -p build/classes build/dex build/gen
     --min-sdk-version 26 --target-sdk-version 34 --java build/gen
 # d8 8.2.2 crashes on anonymous inner classes compiled by javac 21 --release 8: use lambdas / named classes.
 javac --release 8 -Xlint:-options -encoding UTF-8 -classpath "$JAR" -d build/classes \
-    $(find src build/gen -name '*.java') ../src/io/github/tvoverlaysuite/TypeProto.java
+    $(find src build/gen -name '*.java') ../src/io/github/tvoverlaysuite/TypeProto.java ../src/io/github/tvoverlaysuite/PadProto.java
 "$BT/d8" --release --min-api 26 --lib "$JAR" --output build/dex $(find build/classes -name '*.class')
 cp build/base.apk build/unsigned.apk
 (cd build/dex && zip -q ../unsigned.apk classes.dex)

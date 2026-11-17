@@ -27,7 +27,7 @@ public class SetupActivity extends Activity {
 
     private SharedPreferences prefs;
     private LinearLayout panelAgree, panelOff, panelOn;
-    private TextView status, keyLine, phones, dimLine, codeLine, hint, progress, kbLine, btnKb;
+    private TextView status, keyLine, phones, dimLine, codeLine, hint, progress, kbLine, padLine, btnKb;
     private TextView btnAgree, btnNotNow, btnEnable, btnToggle, btnLearn, btnClear, btnDimOff, btnNewCode;
     private TextView cardTitle, urlText, cardCode;
     private ImageView qrView;
@@ -128,6 +128,8 @@ public class SetupActivity extends Activity {
         panelOn.addView(dimLine);
         panelOn.addView(codeLine);
         panelOn.addView(kbLine);
+        padLine = text("", 17, 0xFFD5DAE3, false);
+        panelOn.addView(padLine);
         LinearLayout row = new LinearLayout(this);
         row.setPadding(0, px(18, d), 0, px(12, d));
         btnToggle = button("Show overlay", d);
@@ -322,6 +324,11 @@ public class SetupActivity extends Activity {
                     : apps == 0 ? "Phone typing: ready, no phone app connected"
                     : "Phone typing: ready, " + (apps == 1 ? "1 phone app" : apps + " phone apps") + " connected");
             kbLine.setTextColor(kbOn ? 0xFFD5DAE3 : 0xFFFFD21F);
+            String front = MarkerService.padFront();
+            int padApps = MarkerService.padApps();
+            padLine.setText(front != null ? "Phone trackpad: drives " + (front.isEmpty() ? "the app in front" : front)
+                    : padApps > 0 ? "Phone trackpad: ready (works in " + (padApps == 1 ? "1 app" : padApps + " apps") + " on this TV)"
+                    : "Phone trackpad: no app on this TV supports it yet");
             btnKb.setVisibility(kbOn ? View.GONE : View.VISIBLE);
             hint.setText("Short press: show / hide the marker layer, then draw on your phone (the drawing stays until you clear it). "
                     + "Long press (about 1 second): night dimmer off and photo removed. "

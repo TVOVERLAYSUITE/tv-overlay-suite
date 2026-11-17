@@ -36,6 +36,18 @@ final class Store {
     boolean autoPop() { return p.getBoolean("auto", true); }
     void setAutoPop(boolean on) { p.edit().putBoolean("auto", on).apply(); }
 
+    /** v1.6: open the trackpad by itself when a trackpad app comes to the front on the TV. */
+    boolean padAutoPop() { return p.getBoolean("padAuto", true); }
+    void setPadAutoPop(boolean on) { p.edit().putBoolean("padAuto", on).apply(); }
+
+    /** Trackpad speed, 1 (slow) to 5 (fast). */
+    int padSpeed() { return Math.max(1, Math.min(5, p.getInt("padSpeed", 3))); }
+    void setPadSpeed(int v) { p.edit().putInt("padSpeed", Math.max(1, Math.min(5, v))).apply(); }
+
+    /** Name of the last app the trackpad drove, for "Open … on the TV". */
+    String padApp() { return p.getString("padApp", ""); }
+    void setPadApp(String n) { if (n != null && !n.isEmpty() && !n.equals(padApp())) p.edit().putString("padApp", n).apply(); }
+
     /** Close the bar after Search / Go / Enter in one-line boxes. */
     boolean closeOnEnter() { return p.getBoolean("closeEnter", true); }
     void setCloseOnEnter(boolean on) { p.edit().putBoolean("closeEnter", on).apply(); }

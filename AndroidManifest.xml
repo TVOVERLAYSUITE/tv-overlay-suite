@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.github.tvoverlaysuite" android:versionCode="8" android:versionName="1.5.0">
+    package="io.github.tvoverlaysuite" android:versionCode="9" android:versionName="1.6.0">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -35,6 +35,12 @@
                 <action android:name="android.view.InputMethod"/>
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/keys_method"/>
+        </service>
+        <!-- v1.6: apps on this TV bind here to get the phone trackpad (Messenger; see docs/trackpad.md) -->
+        <service android:name=".PadService" android:exported="true">
+            <intent-filter>
+                <action android:name="io.github.tvoverlaysuite.TRACKPAD"/>
+            </intent-filter>
         </service>
         <receiver android:name=".UpdateReceiver" android:exported="false">
             <intent-filter>

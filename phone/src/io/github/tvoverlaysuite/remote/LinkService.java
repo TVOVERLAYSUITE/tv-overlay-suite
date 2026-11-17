@@ -21,9 +21,11 @@ import android.os.PowerManager;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import io.github.tvoverlaysuite.PadProto;
 import io.github.tvoverlaysuite.TypeProto;
 
 /**
@@ -67,6 +69,15 @@ public class LinkService extends Service {
     private boolean wanted;
     /** TypeActivity, when it is the one showing the panel. Main thread. */
     TypeActivity activityPanel;
+
+    /** v1.6 trackpad: is a trackpad app in front on the TV, and which. Main thread. */
+    boolean padOn;
+    String padName = "";
+    private long padOffAt;
+    /** The first "P f" after (re)connecting is the TV's current state, not a change: it never pops the trackpad. */
+    private boolean padFresh;
+    /** PadActivity while it is on screen. Main thread. */
+    PadActivity padActivity;
 
     static void start(Context c) {
         Intent i = new Intent(c, LinkService.class).setAction(ACTION_KICK);
@@ -171,7 +182,13 @@ public class LinkService extends Service {
                 .setContentIntent(open)
                 .setOngoing(true)
                 .setShowWhen(false);
-        if (status == S_CONNECTED) b.addAction(new Notification.Action.Builder(null, "Type on TV", type).build());
+        if (status == S_CONNECTED) {
+            b.addAction(new Notification.Action.Builder(null, "Type on TV", type).build());
+            PendingIntent pad = PendingIntent.getActivity(this, 4,
+                    new Intent(this, PadActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            b.addAction(new Notification.Action.Builder(null, "Trackpad", pad).build());
+        }
         return b.build();
     }
 
@@ -184,7 +201,7 @@ public class LinkService extends Service {
             }
             Runnable r = onStatus;
             if (r != null) r.run();
-            if (s != S_CONNECTED) { fieldOpen = false; bar.hide(); }
+            if (s != S_CONNECTED) { fieldOpen = false; bar.hide(); padState(false, padName); }
         });
     }
 
@@ -239,6 +256,7 @@ public class LinkService extends Service {
             if ("K bad".equals(reply)) { c.close(); store.setRefused(true); continue; }
             if (!"K ok".equals(reply)) { c.close(); sleep(60_000); continue; }   // "K wait": locked out a minute
             backoff = 1000;
+            main.post(() -> padFresh = true);
             c.setReadTimeout((int) (PING_MS * 2 + 5000));
             ws = c;
             setStatus(S_CONNECTED);
@@ -246,6 +264,11 @@ public class LinkService extends Service {
                 while (running && c.isOpen()) {
                     String t = c.readText();
                     for (String line : t.split("\n")) {
+                        if (line.startsWith("P ")) {
+                            PadProto.Front f = PadProto.parseFront(line.trim());
+                            if (f != null) main.post(() -> padFront(f));
+                            continue;
+                        }
                         TypeProto.Msg m = TypeProto.parse(line.trim());
                         if (m != null) main.post(() -> fromTv(m));
                     }
@@ -376,6 +399,81 @@ public class LinkService extends Service {
     }
 
     void closeBar() { bar.hide(); }
+
+    // ---------------------------------------------------------------- trackpad (v1.6)
+
+    private final Object padLock = new Object();
+    private float padMx, padMy, padSx, padSy;
+    private final ArrayList<String> padQueue = new ArrayList<>();
+    private boolean padSending;
+
+    /** Pointer movement from the trackpad. Any thread; never blocks. Moves that pile up while the network is busy are
+     *  added together into one message, so the pointer never lags behind a backlog. */
+    void padMove(float dx, float dy) {
+        if (ws == null) return;
+        synchronized (padLock) { padMx += dx; padMy += dy; padSchedule(); }
+    }
+
+    void padScroll(float dx, float dy) {
+        if (ws == null) return;
+        synchronized (padLock) { padSx += dx; padSy += dy; padSchedule(); }
+    }
+
+    /** A click, menu, drag or key: sent in order after the movement before it. */
+    void padEvent(String line) {
+        if (ws == null) return;
+        synchronized (padLock) { padFlushSums(); padQueue.add(line); padSchedule(); }
+    }
+
+    private void padFlushSums() {   // holds padLock
+        if (padMx != 0 || padMy != 0) { padQueue.add(PadProto.move(padMx, padMy)); padMx = padMy = 0; }
+        if (padSx != 0 || padSy != 0) { padQueue.add(PadProto.scroll(padSx, padSy)); padSx = padSy = 0; }
+    }
+
+    private void padSchedule() {   // holds padLock
+        if (padSending) return;
+        padSending = true;
+        try { tx.execute(this::padDrain); } catch (RuntimeException e) { padSending = false; }
+    }
+
+    /** kb-send thread: sends everything waiting as one frame, until nothing is left. */
+    private void padDrain() {
+        while (true) {
+            String out;
+            synchronized (padLock) {
+                padFlushSums();
+                if (padQueue.isEmpty()) { padSending = false; return; }
+                out = String.join("\n", padQueue);
+                padQueue.clear();
+            }
+            WsClient c = ws;
+            if (c != null) c.send(out);
+        }
+    }
+
+    private void padFront(PadProto.Front f) {
+        boolean live = !padFresh;
+        padFresh = false;
+        boolean was = padOn;
+        padState(f.on, f.on ? f.name : padName);
+        if (!f.on || was || !live) return;
+        // a trackpad app just came to the front on the TV
+        if (padActivity != null || !store.padAutoPop() || !screenOn || locked() || bar.isShown() || activityPanel != null) return;
+        if (System.currentTimeMillis() - padOffAt < 1500) return;   // the app only blinked (its own video player)
+        if (!TypingBar.allowed(this)) return;   // starting a screen from the background needs "Display over other apps"
+        try {
+            startActivity(new Intent(this, PadActivity.class).putExtra(PadActivity.EXTRA_AUTO, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (RuntimeException ignored) { }
+    }
+
+    private void padState(boolean on, String name) {
+        if (padOn && !on) padOffAt = System.currentTimeMillis();
+        padOn = on;
+        padName = name == null ? "" : name;
+        if (on) store.setPadApp(padName);
+        if (padActivity != null) padActivity.front(on, padName);
+    }
 
     // ---------------------------------------------------------------- receivers (named classes: d8 bug)
 

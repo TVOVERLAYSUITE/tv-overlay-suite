@@ -17,7 +17,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.content.res.ColorStateList;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -36,7 +38,8 @@ public class MainActivity extends Activity {
     private TextView statusDot, statusText, statusSub, permOverlay, permNotes, scanStatus, pairMsg;
     private LinearLayout pairCard, readyCard, tvList, permCard;
     private EditText hostEdit, codeEdit;
-    private Switch autoSw, enterSw;
+    private Switch autoSw, enterSw, padSw;
+    private TextView speedLabel;
     private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
     private volatile boolean scanning;
 
@@ -112,7 +115,7 @@ public class MainActivity extends Activity {
 
         TextView h = text("TV Overlay Suite", 26, TEXT, true);
         col.addView(h);
-        TextView sub = text("Type on your TV from this phone, and draw, point and send to the screen.", 15, MUTED, false);
+        TextView sub = text("Type on your TV from this phone, use it as a trackpad, and draw, point and send to the screen.", 15, MUTED, false);
         sub.setPadding(0, px(4), 0, px(16));
         col.addView(sub);
 
@@ -184,6 +187,9 @@ public class MainActivity extends Activity {
         TextView type = button("Type on the TV now", true);
         type.setOnClickListener(v -> startActivity(new Intent(this, TypeActivity.class).putExtra(TypeActivity.EXTRA_WANT, true)));
         readyCard.addView(type);
+        TextView padBtn = button("Trackpad", true);
+        padBtn.setOnClickListener(v -> startActivity(new Intent(this, PadActivity.class)));
+        readyCard.addView(padBtn);
         TextView draw = button("Draw, laser, messages, photo, dimmer", false);
         draw.setOnClickListener(v -> startActivity(new Intent(this, DrawActivity.class)));
         readyCard.addView(draw);
@@ -193,8 +199,23 @@ public class MainActivity extends Activity {
         enterSw = toggle("Close after Search / Go / Enter", store.closeOnEnter());
         enterSw.setOnCheckedChangeListener((bt, on) -> store.setCloseOnEnter(on));
         readyCard.addView(enterSw);
+        padSw = toggle("Open the trackpad when a trackpad app opens on the TV", store.padAutoPop());
+        padSw.setOnCheckedChangeListener((bt, on) -> store.setPadAutoPop(on));
+        readyCard.addView(padSw);
+        speedLabel = text("", 15, TEXT, false);
+        speedLabel.setPadding(0, px(14), 0, px(2));
+        readyCard.addView(speedLabel);
+        SeekBar speed = new SeekBar(this);
+        speed.setMax(4);
+        speed.setProgress(store.padSpeed() - 1);
+        speed.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        speed.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        speed.setOnSeekBarChangeListener(new SpeedListener(this));
+        readyCard.addView(speed);
+        showSpeed();
         TextView tip = text("Tip: add the “Type on TV” tile to Quick Settings (swipe down twice, tap the pencil) "
-                + "to start typing from anywhere. On the TV, the phone key on the keyboard also opens the bar here.", 13, MUTED, false);
+                + "to start typing from anywhere. On the TV, the phone key on the keyboard also opens the bar here. "
+                + "The connection notification has Type on TV and Trackpad buttons too.", 13, MUTED, false);
         tip.setPadding(0, px(10), 0, 0);
         readyCard.addView(tip);
         TextView forget = button("Forget this TV", false);
@@ -221,7 +242,7 @@ public class MainActivity extends Activity {
         String t, sub;
         if (!paired) { dot = MUTED; t = "Not paired"; sub = "Pair once; the app finds the TV by itself after that."; }
         else switch (s) {
-            case LinkService.S_CONNECTED: dot = GOOD; t = "Connected to " + name; sub = "Select any text box on the TV to start typing here."; break;
+            case LinkService.S_CONNECTED: dot = GOOD; t = "Connected to " + name; sub = "Select any text box on the TV to start typing here, or open the trackpad."; break;
             case LinkService.S_REFUSED: dot = WARN; t = "The TV changed its pairing code"; sub = "Type the new code below."; break;
             case LinkService.S_NOT_FOUND: dot = WARN; t = "Can't find " + name; sub = "Is the TV on, with TV Overlay Suite switched on, and is this phone on the same Wi-Fi?"; break;
             case LinkService.S_ASLEEP: dot = MUTED; t = "Paused"; sub = "Reconnects when you use the phone."; break;
@@ -240,6 +261,24 @@ public class MainActivity extends Activity {
         permOverlay.setVisibility(overlay ? View.GONE : View.VISIBLE);
         permNotes.setVisibility(notes ? View.GONE : View.VISIBLE);
         permCard.setVisibility(paired && (!overlay || !notes) ? View.VISIBLE : View.GONE);
+    }
+
+    private static final String[] SPEED_NAMES = {"slowest", "slow", "normal", "fast", "fastest"};
+
+    void speedChanged(int progress) {
+        store.setPadSpeed(progress + 1);
+        showSpeed();
+    }
+
+    private void showSpeed() { speedLabel.setText("Trackpad speed: " + SPEED_NAMES[store.padSpeed() - 1]); }
+
+    /** Named class, not anonymous (d8 8.2.2 bug). */
+    static final class SpeedListener implements SeekBar.OnSeekBarChangeListener {
+        private final MainActivity a;
+        SpeedListener(MainActivity a) { this.a = a; }
+        @Override public void onProgressChanged(SeekBar s, int p, boolean user) { if (user) a.speedChanged(p); }
+        @Override public void onStartTrackingTouch(SeekBar s) { }
+        @Override public void onStopTrackingTouch(SeekBar s) { }
     }
 
     // ---------------------------------------------------------------- pairing
