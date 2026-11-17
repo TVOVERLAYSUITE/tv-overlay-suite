@@ -5,6 +5,7 @@
 #   bash tvos-install.sh TV_IP TV-Overlay-Suite-v1.4.0.apk   install or update, then switch the service on
 #   bash tvos-install.sh TV_IP --enable                      only switch the service on
 #   bash tvos-install.sh TV_IP --uninstall                   remove the app
+#   bash tvos-install.sh TV_IP --keyboard                    make the suite's keyboard the TV keyboard (v1.5+)
 # TV_IP is the TV's address on your network (TV: Settings > Network & Internet > your Wi-Fi). The TV must have
 # Developer options > USB debugging switched on; the first time it asks "Allow USB debugging?".
 #
@@ -23,7 +24,7 @@ if [ $# -lt 2 ]; then
 fi
 IP=$(echo "$1" | tr -d '[:space:]'); ACTION=$2
 case "$IP" in *:*) TARGET=$IP ;; *) TARGET=$IP:5555 ;; esac
-if [ "$ACTION" != "--enable" ] && [ "$ACTION" != "--uninstall" ] && [ ! -f "$ACTION" ]; then
+if [ "$ACTION" != "--enable" ] && [ "$ACTION" != "--uninstall" ] && [ "$ACTION" != "--keyboard" ] && [ ! -f "$ACTION" ]; then
   echo "File not found: $ACTION  (run this from the folder that holds the APK)"; exit 1
 fi
 
@@ -41,6 +42,15 @@ A="adb -s $TARGET"
 if [ "$ACTION" = "--uninstall" ]; then
   $A uninstall $PKG; exit $?
 fi
+
+# v1.5: the suite's keyboard (type on the TV from the phone app). Waits for the TV to register it after an install.
+keyboard() {
+  IME=$PKG/.KeysIME
+  for i in $(seq 1 20); do $A shell ime list -a -s | grep -q "$IME" && break; sleep 1; done
+  $A shell ime enable "$IME" >/dev/null && $A shell ime set "$IME" >/dev/null \
+    && echo "TV keyboard: TV Overlay Suite keyboard" || echo "Could not switch the TV keyboard; use the app's \"Use as TV keyboard\" button"
+}
+if [ "$ACTION" = "--keyboard" ]; then keyboard; exit 0; fi
 if [ "$ACTION" != "--enable" ]; then
   $A install -r "$ACTION" || exit 1
   echo "Waiting for the TV to finish the update..."

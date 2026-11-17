@@ -27,7 +27,7 @@ public class SetupActivity extends Activity {
 
     private SharedPreferences prefs;
     private LinearLayout panelAgree, panelOff, panelOn;
-    private TextView status, keyLine, phones, dimLine, codeLine, hint, progress;
+    private TextView status, keyLine, phones, dimLine, codeLine, hint, progress, kbLine, btnKb;
     private TextView btnAgree, btnNotNow, btnEnable, btnToggle, btnLearn, btnClear, btnDimOff, btnNewCode;
     private TextView cardTitle, urlText, cardCode;
     private ImageView qrView;
@@ -121,11 +121,13 @@ public class SetupActivity extends Activity {
         phones = text("", 17, 0xFFD5DAE3, false);
         dimLine = text("", 17, 0xFFD5DAE3, false);
         codeLine = text("", 17, 0xFFD5DAE3, false);
+        kbLine = text("", 17, 0xFFD5DAE3, false);
         panelOn.addView(status);
         panelOn.addView(keyLine);
         panelOn.addView(phones);
         panelOn.addView(dimLine);
         panelOn.addView(codeLine);
+        panelOn.addView(kbLine);
         LinearLayout row = new LinearLayout(this);
         row.setPadding(0, px(18, d), 0, px(12, d));
         btnToggle = button("Show overlay", d);
@@ -138,8 +140,10 @@ public class SetupActivity extends Activity {
         LinearLayout row2 = new LinearLayout(this);
         btnDimOff = button("Dimmer off", d);
         btnNewCode = button("New pairing code", d);
+        btnKb = button("Use as TV keyboard", d);
         row2.addView(btnDimOff);
         row2.addView(btnNewCode);
+        row2.addView(btnKb);
         panelOn.addView(row2);
         hint = text("", 14, 0xFF8A93A3, false);
         hint.setPadding(0, px(14, d), px(24, d), 0);
@@ -200,6 +204,7 @@ public class SetupActivity extends Activity {
             MarkerService s = MarkerService.instance;
             if (s != null) s.setDim(0);
         });
+        btnKb.setOnClickListener(v -> { KbSetup.useSuiteKeyboard(this); refresh(); });
         btnNewCode.setOnClickListener(v -> {
             MarkerService.newPairingCode(this);
             refresh();
@@ -311,6 +316,13 @@ public class SetupActivity extends Activity {
             btnDimOff.setAlpha(dim > 0 ? 1f : 0.45f);
             String code = MarkerService.pairingCode(this);
             codeLine.setText("Pairing code:  " + Pairing.pretty(code));
+            boolean kbOn = KbSetup.isCurrent(this);
+            int apps = MarkerService.kbPhones();
+            kbLine.setText(!kbOn ? "Phone typing: the suite is not the TV keyboard yet"
+                    : apps == 0 ? "Phone typing: ready, no phone app connected"
+                    : "Phone typing: ready, " + (apps == 1 ? "1 phone app" : apps + " phone apps") + " connected");
+            kbLine.setTextColor(kbOn ? 0xFFD5DAE3 : 0xFFFFD21F);
+            btnKb.setVisibility(kbOn ? View.GONE : View.VISIBLE);
             hint.setText("Short press: show / hide the marker layer, then draw on your phone (the drawing stays until you clear it). "
                     + "Long press (about 1 second): night dimmer off and photo removed. "
                     + "“New pairing code” disconnects every phone; they scan the new QR to come back.\nHelp: " + REPO);

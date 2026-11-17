@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="svc_desc">TV Overlay Suite uses this service only to catch the remote button you choose and to draw its layers (marker, night dimmer, messages, laser pointer, photo) over other apps. It does not read screen content, collect data or use the internet; it only talks to phones on your home network that you pair with the code shown on the TV.</string>
+    <string name="kb_name">TV Overlay Suite keyboard</string>
+    <string name="kb_subtype">English + Español</string>
 </resources>

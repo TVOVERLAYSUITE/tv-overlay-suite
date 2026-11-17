@@ -2,6 +2,20 @@
 
 This project uses [semantic versioning](https://semver.org/).
 
+## 1.5.0 — type from your phone
+
+- **Type on the TV from your phone.** A new phone app pops up a typing bar when a text box opens on the TV, and every
+  letter goes to the TV as you type it. Your phone's own keyboard does the typing, so swipe and voice typing,
+  autocorrect and paste all work. You can also open the bar from a Quick Settings tile, the app's notification, or the
+  new phone key on the TV keyboard.
+- **The suite has its own TV keyboard**: a fast QWERTY layout for the remote with English and
+  Spanish suggestions, accents on a long press, and remote shortcuts. **Use as TV keyboard** on the setup screen
+  switches to it. The app keeps it selected after updates.
+- **The phone app finds the TV by itself** (mDNS) when the TV's Wi-Fi address changes. The app's drawing screen opens
+  the TV page already paired, with no QR code to scan.
+- The Chrome page offers the app with an **Open the app** link (Android only, and you can dismiss it).
+- Keyboard connections from the phone app don't count as connected phones, so they don't keep the TV awake.
+
 ## 1.4.1
 
 - **One slow phone no longer freezes the others.** Each phone now has its own send queue. A phone that stops

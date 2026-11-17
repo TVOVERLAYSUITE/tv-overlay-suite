@@ -7,6 +7,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
+import android.os.Build;
+import android.provider.Settings;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -121,6 +125,7 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
         server.setGate(() -> pairCode);
         server.start();
         instance = this;
+        advertise();
         applyDim();          // restore the dimmer after a reboot
         notifyChange();
     }
@@ -136,6 +141,7 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
         }
         layers.clear();
         if (server != null) server.stop();
+        stopAdvertising();
         super.onDestroy();
     }
 
@@ -589,10 +595,100 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
 
     int phoneCount() { return server == null ? 0 : server.clientCount(); }
 
+    // ---------------- phone app: keyboard connections and discovery (v1.5) ----------------
+
+    static final String NSD_TYPE = "_tvoverlay._tcp";
+    private NsdManager nsd;
+    private NsdManager.RegistrationListener nsdListener;
+
+    /** Sends a typing message to every phone app. Any thread. */
+    static void sendKb(String msg) {
+        MarkerService s = instance;
+        if (s != null && s.server != null) s.server.broadcastKb(msg);
+    }
+
+    /** Phone apps connected for typing. */
+    static int kbPhones() {
+        MarkerService s = instance;
+        return s == null || s.server == null ? 0 : s.server.kbCount();
+    }
+
+    /** This install's id: lets the phone app find this TV again after its Wi-Fi address changes. */
+    static synchronized String tvId(Context ctx) {
+        SharedPreferences p = ctx.getSharedPreferences("marker", MODE_PRIVATE);
+        String id = p.getString("tvid", null);
+        if (id == null || !id.matches("[A-Za-z0-9]{12}")) {
+            id = Pairing.newCode() + Pairing.newCode();
+            p.edit().putString("tvid", id).apply();
+        }
+        return id;
+    }
+
+    static String tvName(Context ctx) {
+        String n = null;
+        try { n = Settings.Global.getString(ctx.getContentResolver(), "device_name"); } catch (RuntimeException ignored) { }
+        if (n == null || n.trim().isEmpty()) n = Build.MODEL;
+        return n == null ? "TV" : n.trim();
+    }
+
+    /** Announces the server on the home network (mDNS) so the phone app finds the TV without its address. */
+    private void advertise() {
+        try {
+            nsd = (NsdManager) getSystemService(NSD_SERVICE);
+            NsdServiceInfo si = new NsdServiceInfo();
+            si.setServiceName("TV Overlay Suite " + tvId(this).substring(0, 4));
+            si.setServiceType(NSD_TYPE);
+            si.setPort(PORT);
+            si.setAttribute("id", tvId(this));
+            si.setAttribute("v", "1.5");
+            nsdListener = new NsdListener();
+            nsd.registerService(si, NsdManager.PROTOCOL_DNS_SD, nsdListener);
+        } catch (RuntimeException e) {
+            nsdListener = null;
+        }
+    }
+
+    private void stopAdvertising() {
+        try { if (nsd != null && nsdListener != null) nsd.unregisterService(nsdListener); } catch (RuntimeException ignored) { }
+        nsdListener = null;
+    }
+
+    /** Named class, not anonymous (d8 8.2.2 bug). Registration failures are harmless: the phone app also keeps the
+     *  last address it used. */
+    private static final class NsdListener implements NsdManager.RegistrationListener {
+        @Override public void onRegistrationFailed(NsdServiceInfo si, int err) { }
+        @Override public void onUnregistrationFailed(NsdServiceInfo si, int err) { }
+        @Override public void onServiceRegistered(NsdServiceInfo si) { }
+        @Override public void onServiceUnregistered(NsdServiceInfo si) { }
+    }
+
+    private void kbOpened(InkServer.Client c) {
+        c.send(TypeProto.id(tvId(this), tvName(this)));
+        main.post(() -> { KeysIME k = KeysIME.instance; if (k != null) k.phonesChanged(); notifyChange(); });
+    }
+
+    /** Network thread: typing lines from a phone app go to the keyboard on the main thread. */
+    private void kbText(InkServer.Client c, String text) {
+        for (String line : text.split("\n")) {
+            TypeProto.Msg m = TypeProto.parse(line.trim());
+            if (m == null) continue;
+            main.post(() -> {
+                KeysIME k = KeysIME.instance;
+                if (k == null) {
+                    if (m.kind == 'w') c.send(TypeProto.none("ime"));
+                    return;
+                }
+                String reply = k.fromPhone(m);
+                if (reply != null) c.send(reply);
+            });
+        }
+    }
+
     // ---------------- InkServer.Handler (network threads) ----------------
 
     @Override
     public void onOpen(InkServer.Client c) {
+        if (c.kb) { kbOpened(c); return; }
         String snap = ink.snapshot();
         c.send("x\n" + snap + "v " + (shown ? 1 : 0) + "\nd " + dimLevel + " " + dimWarmth + "\n" + photoState);
         phonesChanged();
@@ -600,6 +696,7 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
 
     @Override
     public void onText(InkServer.Client c, String text) {
+        if (c.kb) { kbText(c, text); return; }
         String rest = Extras.route(text, this);   // dimmer / pop-up / laser lines
         if (rest.isEmpty()) return;
         int flags = ink.apply(c, rest);
@@ -614,6 +711,10 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
 
     @Override
     public void onClose(InkServer.Client c) {
+        if (c.kb) {
+            main.post(() -> { KeysIME k = KeysIME.instance; if (k != null) k.phonesChanged(); notifyChange(); });
+            return;
+        }
         String ended = ink.endOpenStrokes(c); // strokes cut off mid-line
         if (!ended.isEmpty()) server.broadcast(ended, c);
         phonesChanged();

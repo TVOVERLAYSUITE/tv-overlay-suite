@@ -54,6 +54,9 @@ public final class InkServer {
         static final int MAX_BACKLOG_BYTES = 4 * 1024 * 1024;
 
         final Socket socket;
+        /** v1.5: a keyboard connection from the phone app (path /kb). It gets only typing messages: no drawing
+         *  snapshot or broadcasts, and it does not count as a "phone connected" (which keeps the TV awake). */
+        public final boolean kb;
         private final OutputStream out;
         private final Executor pool;
         private final ArrayDeque<byte[]> queue = new ArrayDeque<>();
@@ -61,8 +64,11 @@ public final class InkServer {
         private boolean draining;
         volatile boolean open = true;
 
-        Client(Socket s, Executor pool) throws IOException {
+        Client(Socket s, Executor pool) throws IOException { this(s, pool, false); }
+
+        Client(Socket s, Executor pool, boolean kb) throws IOException {
             socket = s;
+            this.kb = kb;
             this.pool = pool;
             out = new BufferedOutputStream(s.getOutputStream(), 32768);
         }
@@ -173,7 +179,24 @@ public final class InkServer {
         clients.clear();
     }
 
-    public int clientCount() { return clients.size(); }
+    /** Drawing phones (browser pages and the app's drawing screen); keyboard connections are not counted. */
+    public int clientCount() {
+        int n = 0;
+        for (Client c : clients) if (!c.kb) n++;
+        return n;
+    }
+
+    /** Keyboard connections from the phone app (v1.5). */
+    public int kbCount() {
+        int n = 0;
+        for (Client c : clients) if (c.kb) n++;
+        return n;
+    }
+
+    /** Sends to every keyboard connection. */
+    public void broadcastKb(String text) {
+        for (Client c : clients) if (c.kb) c.send(text);
+    }
 
     public void setGate(Gate g) { gate = g; }
 
@@ -241,7 +264,7 @@ public final class InkServer {
     }
 
     public void broadcast(String text, Client except) {
-        for (Client c : clients) if (c != except) c.send(text);
+        for (Client c : clients) if (c != except && !c.kb) c.send(text);
     }
 
     private void acceptLoop() {
@@ -287,7 +310,8 @@ public final class InkServer {
                 o.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                         + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
                 o.flush();
-                Client c = new Client(s, sender);
+                String p0 = path.indexOf('?') >= 0 ? path.substring(0, path.indexOf('?')) : path;
+                Client c = new Client(s, sender, p0.equals("/kb"));
                 if (!authenticate(s, in, c)) {   // the reply was already written and flushed
                     c.close();
                     return;

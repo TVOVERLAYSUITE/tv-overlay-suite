@@ -22,6 +22,11 @@ public class UpdateReceiver extends BroadcastReceiver {
             try {
                 SystemClock.sleep(6000);
                 Enabler.enableWithPermission(app, null);
+                // v1.5: if the suite was the TV keyboard before the update, keep it that way
+                if (app.getSharedPreferences("marker", Context.MODE_PRIVATE).getBoolean("kb_used", false)
+                        && !KbSetup.isCurrent(app)) {
+                    KbSetup.useSuiteKeyboard(app, false);
+                }
             } finally {
                 pr.finish();
             }

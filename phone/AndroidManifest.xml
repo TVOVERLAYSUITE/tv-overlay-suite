@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.tvoverlaysuite.remote" android:versionCode="1" android:versionName="1.5.0">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- mDNS: finding the TV after its Wi-Fi address changes -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <!-- the typing bar floats over other apps -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <application android:label="TV Overlay Suite" android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false"
+        android:usesCleartextTraffic="true" android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- "Open the app" on the TV's phone page: tvoverlaysuite://pair?h=TV_ADDRESS&k=CODE -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="tvoverlaysuite" android:host="pair"/>
+            </intent-filter>
+        </activity>
+        <activity android:name=".TypeActivity" android:exported="false" android:excludeFromRecents="true"
+            android:taskAffinity="io.github.tvoverlaysuite.remote.type" android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize"/>
+        <activity android:name=".DrawActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"/>
+        <service android:name=".LinkService" android:exported="false"
+            android:foregroundServiceType="connectedDevice"/>
+        <service android:name=".TypeTile" android:exported="true" android:label="Type on TV"
+            android:icon="@drawable/ic_note"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+        </service>
+        <receiver android:name=".BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

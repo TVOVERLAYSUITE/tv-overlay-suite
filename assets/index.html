@@ -62,6 +62,13 @@
     box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 10px 30px rgba(0,0,0,.45); }
   #board canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
   #tvlabel { position:absolute; right:12px; bottom:9px; font-size:11px; letter-spacing:.14em; color:rgba(255,255,255,.35); pointer-events:none; }
+  /* v1.5: link to the phone app (Android Chrome only, never inside the app itself) */
+  #appChip { position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:30;
+    display:none; align-items:center; gap:10px; padding:10px 12px 10px 16px; border-radius:999px; background:var(--panel2);
+    color:var(--text); font:600 13px system-ui, sans-serif; box-shadow:0 6px 24px rgba(0,0,0,.45); white-space:nowrap; }
+  #appChip.show { display:flex; }
+  #appChip a { color:#151820; background:var(--accent); text-decoration:none; padding:7px 12px; border-radius:999px; }
+  #appChip button { border:0; background:none; color:var(--muted); font:600 18px system-ui, sans-serif; padding:0 4px; }
   #hiddenChip { position:absolute; left:50%; top:20px; transform:translateX(-50%); display:none; border:0; cursor:pointer;
     padding:9px 16px; border-radius:999px; background:var(--accent); color:#151820; font:600 13px system-ui, sans-serif;
     box-shadow:0 6px 20px rgba(0,0,0,.4); z-index:6; }
@@ -190,6 +197,7 @@
     <button id="pairGo" disabled>Connect</button>
   </div>
 </div>
+<div id="appChip"><span>Type on the TV from your phone</span><a id="appLink" href="#">Open the app</a><button id="appX" aria-label="Hide">×</button></div>
 <div id="app">
   <div id="main">
     <div id="status"><span class="dot"></span><span id="statusText">Connecting to TV…</span></div>
@@ -935,6 +943,24 @@
   fit();
   connect();
 })();
+
+  // ---------- v1.5: the phone app (type into any TV text box). Offered on Android Chrome, hidden inside the app ----------
+  (function appChip() {
+    const ua = navigator.userAgent;
+    if (!/Android/.test(ua) || /; wv\)/.test(ua) || /TVOverlaySuiteApp/.test(ua)) return;
+    try { if (localStorage.getItem('tvos.appchip') === 'x') return; } catch (_) {}
+    const chip = $('#appChip'), link = $('#appLink');
+    const fallback = encodeURIComponent('https://github.com/TVOVERLAYSUITE/tv-overlay-suite/releases/latest');
+    const update = () => {
+      link.href = 'intent://pair?h=' + encodeURIComponent(location.host) + (pairCode ? '&k=' + pairCode : '')
+        + '#Intent;scheme=tvoverlaysuite;package=io.github.tvoverlaysuite.remote;S.browser_fallback_url=' + fallback + ';end';
+    };
+    update();
+    link.addEventListener('click', update);
+    $('#appX').addEventListener('click', () => { chip.classList.remove('show'); try { localStorage.setItem('tvos.appchip', 'x'); } catch (_) {} });
+    setTimeout(() => chip.classList.add('show'), 1500);
+    setTimeout(() => chip.classList.remove('show'), 14000);
+  })();
 </script>
 </body>
 </html>

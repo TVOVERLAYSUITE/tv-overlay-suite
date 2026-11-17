@@ -1,14 +1,35 @@
 # TV Overlay Suite
 
-Draw, point, dim the screen and send messages or photos to your **Android TV / Google TV** from your phone — over
-whatever is playing.
+**Type on your Android TV / Google TV from your phone, as fast as you text.** Select any search box on the TV and a
+typing bar pops up on your phone, with your own phone keyboard: swipe typing, voice typing, autocorrect, paste. Every
+letter appears on the TV as you type it.
 
-No account, no cloud, no app on the phone: the TV serves a small web page on your home network and you open it in
-Chrome by scanning a QR code.
+It also lets you draw, point, dim the screen and send messages or photos to the TV, over whatever is playing.
+
+No account and no cloud: the phone talks straight to the TV over your home Wi-Fi.
 
 <!-- docs/demo.gif: drawing over a video (to be added) -->
 
 ## Features
+
+### Type from your phone (new in 1.5)
+
+The suite now includes its own TV keyboard (a fast on-screen QWERTY for the remote) and a small **phone app**:
+
+- **Pops up by itself.** When a text box opens on the TV, a typing bar appears at the top of your phone screen, over
+  whatever app you're in. Turn that off in the app if you prefer to open it yourself: from the **Type on TV** Quick
+  Settings tile, the app's notification, or the **phone key** on the TV keyboard.
+- **Live, letter by letter.** Each change goes to the TV the moment you make it. On a home network this takes a few
+  milliseconds, so what you see on the TV keeps up with your thumbs.
+- **Your phone keyboard, not a copy.** Gboard swipe typing, voice typing, Spanish/English autocorrect and your phone
+  clipboard all work, because the phone's own keyboard is doing the typing. Moving the cursor, backspace, and
+  Search/Go/Enter work too.
+- **Works in any app's text box**: browsers, YouTube, Netflix, Settings, logins. In password boxes, the phone starts
+  with an empty box and the TV's existing text is never sent to the phone.
+- **Finds the TV by itself** after the TV's Wi-Fi address changes, and goes quiet a minute after your phone's screen
+  turns off.
+
+### Overlays
 
 | | |
 |---|---|
@@ -39,6 +60,16 @@ The screen stays awake while a phone is connected and a layer is showing.
 - Only tested so far on one TV (see [Tested on](#tested-on)); reports from other models are welcome.
 
 ## Install
+
+**Two apps:** the TV app (`TV-Overlay-Suite-v….apk`) and, for typing from the phone, the phone app
+(`TV-Overlay-Suite-Phone-v….apk`, Android 8 or newer). The drawing tools also work without the phone app, in Chrome.
+
+**Phone app:** download the APK on the phone and open it (allow your browser or Files app to install apps when
+asked). Open **TV Overlay Suite**, pick your TV, type the pairing code shown on the TV, and allow **Display over other
+apps** when asked. On the TV, press **Use as TV keyboard** on the setup screen (or run
+`bash tools/tvos-install.sh <tv-ip> --keyboard`).
+
+**TV app:**
 
 The app is not on Google Play yet. Get the APK from the
 [latest release](https://github.com/TVOVERLAYSUITE/tv-overlay-suite/releases/latest).
@@ -121,6 +152,10 @@ same steps with your exact address.
 - Long press depends on the remote: some remotes don't report how long a button is held.
 - The page talks to the TV over plain HTTP on your home network. The pairing code keeps other people on the same
   Wi-Fi from connecting, but the traffic itself is not encrypted. Use it on networks you trust.
+- Typing from the phone needs the suite's keyboard to be the TV keyboard. While another keyboard (Gboard, for
+  example) is selected, the phone can't type into the TV.
+- A few apps draw their own on-screen keyboard instead of using the TV's keyboard (some game and streaming apps).
+  Typing from the phone can't reach those.
 - "Enable automatically" needs USB debugging on and the classic adb port (5555). Android may restrict on-device adb
   in future versions; the manual method above keeps working.
 
@@ -130,6 +165,10 @@ same steps with your exact address.
   over other apps. It does **not** read what is on the screen.
 - The app collects no data and has no analytics. It does not use the internet. It only talks to phones on your home
   network that you pair with the code.
+- The keyboard sees what you type, as every keyboard does. It sends the text of the box you're typing in only to
+  your paired phone apps, never anywhere else, and never sends what's already in a password box. Words you type often
+  are kept on the TV for suggestions (never in password boxes).
+- The phone app only talks to the TV you paired it with. It has no analytics and no other network access.
 - Photos sent from a phone stay in the TV's memory only while they are shown, and are never saved or uploaded.
   Drawings stay in memory until you clear them or the TV restarts.
 
@@ -142,6 +181,8 @@ same steps with your exact address.
 | "Too many wrong codes" | Five wrong codes lock that phone out for a minute. |
 | "Could not reach the TV's debugging service" | USB debugging is off, or the TV only offers Wireless debugging. See [the manual method](#setup). |
 | After an update the button does nothing | Open the app once; it switches the service back on. If that fails, press **Enable automatically** again. |
+| The typing bar doesn't pop up | In the phone app, check that it says **Connected** and that **Display over other apps** is allowed. On the TV, the setup screen must say **Phone typing: ready**. |
+| The phone says "Set TV Overlay Suite as the TV's keyboard first" | Press **Use as TV keyboard** on the TV's setup screen. |
 | Motion mode is greyed out | See [the Chrome setting](#motion-pointing-needs-one-chrome-setting). |
 
 ## Tested on
@@ -161,17 +202,21 @@ No Gradle needed: `build.sh` runs aapt2, javac, d8, zipalign and apksigner from 
 export ANDROID_SDK=~/android-sdk
 ./build.sh                                  # test build, signed with a throwaway debug key
 TVOS_KEYSTORE=release.p12 TVOS_KS_PASS=… ./build.sh   # release build
+phone/build.sh                              # the phone app (same signing variables)
 ```
 
 Tests:
 ```
-bash test/run-tests.sh            # protocol, pairing, adb client, accessibility-list editing
+bash test/run-tests.sh            # protocol, pairing, adb client, accessibility-list editing, typing
 python3 test/e2e.py <chrome-path> # two simulated phones against test/TestHost (see the file header)
 ```
 
 How the pieces fit: `MarkerService` (accessibility service and window stack: dimmer < photo < ink < pop-ups <
 pointer), `InkServer` (HTTP + WebSocket + pairing), `Ink` / `Extras` (protocol, documented at the top of each file),
 `Enabler` + `Adb` (the "Enable automatically" button), `SetupActivity`, and `assets/index.html` (the phone page).
+Typing (1.5): `KeysIME` (the TV keyboard; mirrors the open box to phone apps on path `/kb`), `TypeProto` (the typing
+messages and edit logic, shared with the phone app), and `phone/` (the phone app: `LinkService` keeps the
+connection, `TypePanel` sends each edit, `TypingBar` is the floating window).
 
 ## License
 
