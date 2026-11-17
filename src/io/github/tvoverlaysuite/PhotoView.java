@@ -38,6 +38,13 @@ final class PhotoView extends View {
 
     Bitmap bitmap() { return bitmap; }
 
+    /** Call after the view is taken off the screen: frees the photo's memory now instead of at the next garbage
+     *  collection (a phone photo can be several MB, and TVs have little RAM). The bitmap is owned by this view only. */
+    void release() {
+        removeCallbacks(fade);
+        if (!bitmap.isRecycled()) bitmap.recycle();
+    }
+
     /** Photo size on screen for a size index (0 small, 1 medium, 2 large), keeping its proportions. */
     static int[] boxFor(Bitmap b, int size, int screenW, int screenH) {
         float frac = size == 0 ? 0.28f : size == 2 ? 0.55f : 0.40f;

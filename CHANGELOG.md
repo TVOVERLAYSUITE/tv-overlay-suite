@@ -2,6 +2,14 @@
 
 This project uses [semantic versioning](https://semver.org/).
 
+## 1.4.1
+
+- **One slow phone no longer freezes the others.** Each phone now has its own send queue. A phone that stops
+  reading (left the Wi-Fi, screen locked mid-drawing) used to stall drawing for every phone; now only its own queue
+  waits, and once it is far behind it is disconnected. It reconnects by itself and gets the full picture.
+- A removed photo's memory is freed right away instead of at the next garbage collection.
+- The phone page files are read from the app once instead of on every page load.
+
 ## 1.4.0 — first public release
 
 - **Pairing code.** Only phones that know the TV's 6-character code can connect. The QR carries it; the setup

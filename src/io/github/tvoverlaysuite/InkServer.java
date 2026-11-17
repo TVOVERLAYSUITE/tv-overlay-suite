@@ -12,12 +12,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayDeque;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -45,25 +47,67 @@ public final class InkServer {
     }
 
     public static final class Client {
+        /** Messages a phone may fall behind by before it is dropped. A dropped phone reconnects by itself and gets a
+         *  fresh full picture (onOpen snapshot), so nothing is lost; dropping single messages instead would leave
+         *  holes in its drawing. */
+        static final int MAX_BACKLOG_MSGS = 1024;
+        static final int MAX_BACKLOG_BYTES = 4 * 1024 * 1024;
+
         final Socket socket;
         private final OutputStream out;
-        private final ExecutorService sender;
+        private final Executor pool;
+        private final ArrayDeque<byte[]> queue = new ArrayDeque<>();
+        private int queuedBytes;
+        private boolean draining;
         volatile boolean open = true;
 
-        Client(Socket s, ExecutorService sender) throws IOException {
+        Client(Socket s, Executor pool) throws IOException {
             socket = s;
-            this.sender = sender;
+            this.pool = pool;
             out = new BufferedOutputStream(s.getOutputStream(), 32768);
         }
 
-        /** Queues a text message. Safe from any thread: the write happens on the sender thread, never the caller's
-         *  (Android kills the app if the main thread touches the network). */
+        /** Queues a text message. Safe from any thread and never blocks: each phone has its own queue, written by a
+         *  pool thread (Android kills the app if the main thread touches the network). A phone that stops reading
+         *  (left the Wi-Fi, screen off) only stalls its own queue; once it is too far behind it is disconnected. */
         public void send(String text) {
+            if (!open) return;
             final byte[] p = text.getBytes(StandardCharsets.UTF_8);
-            try {
-                sender.execute(() -> sendFrame(0x1, p));
-            } catch (RuntimeException ignored) {
-                // sender shut down
+            boolean start = false, tooFar = false;
+            synchronized (queue) {
+                if (!queue.isEmpty()
+                        && (queue.size() >= MAX_BACKLOG_MSGS || queuedBytes + (long) p.length > MAX_BACKLOG_BYTES)) {
+                    tooFar = true;
+                } else {
+                    queue.add(p);
+                    queuedBytes += p.length;
+                    if (!draining) { draining = true; start = true; }
+                }
+            }
+            if (tooFar) { close(); return; }
+            if (start) {
+                try {
+                    pool.execute(this::drain);
+                } catch (RuntimeException e) {   // pool shut down
+                    synchronized (queue) { draining = false; }
+                }
+            }
+        }
+
+        /** Writes queued messages in order until the queue is empty. Runs on one pool thread at a time per phone. */
+        private void drain() {
+            while (true) {
+                byte[] p;
+                synchronized (queue) {
+                    p = open ? queue.poll() : null;
+                    if (p == null) {
+                        draining = false;
+                        if (!open) { queue.clear(); queuedBytes = 0; }
+                        return;
+                    }
+                    queuedBytes -= p.length;
+                }
+                sendFrame(0x1, p);
             }
         }
 
@@ -77,9 +121,11 @@ public final class InkServer {
             }
         }
 
+        /** Not synchronized on purpose: closing the socket is what unblocks a write stuck on a dead phone. */
         public void close() {
             open = false;
             try { socket.close(); } catch (IOException ignored) { }
+            synchronized (queue) { queue.clear(); queuedBytes = 0; }
         }
     }
 
@@ -96,7 +142,8 @@ public final class InkServer {
     private final int port;
     private final Handler handler;
     private final List<Client> clients = new CopyOnWriteArrayList<>();
-    private final ExecutorService sender = Executors.newSingleThreadExecutor(r -> {
+    /** Writers for the phones' queues: one busy thread per phone that has messages waiting, idle ones expire. */
+    private final ExecutorService sender = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "ink-send");
         t.setDaemon(true);
         return t;

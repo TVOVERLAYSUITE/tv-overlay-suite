@@ -417,6 +417,7 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
     private void removePhoto() {
         if (photoView == null) return;
         detach(photoView);
+        photoView.release();
         photoView = null;
         photoLp = null;
         photoChanged();
@@ -628,6 +629,9 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
         });
     }
 
+    /** Phone page files, read from the APK once (they cannot change while the app runs). */
+    private final java.util.concurrent.ConcurrentHashMap<String, byte[]> pageCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Override
     public byte[] page(String path) {
         String asset;
@@ -637,12 +641,16 @@ public class MarkerService extends AccessibilityService implements InkServer.Han
             case "/manifest.json": asset = "manifest.json"; break;
             default: return null;
         }
+        byte[] cached = pageCache.get(asset);
+        if (cached != null) return cached;
         try (InputStream in = getAssets().open(asset)) {
             ByteArrayOutputStream b = new ByteArrayOutputStream();
             byte[] buf = new byte[16384];
             int r;
             while ((r = in.read(buf)) > 0) b.write(buf, 0, r);
-            return b.toByteArray();
+            byte[] data = b.toByteArray();
+            pageCache.put(asset, data);
+            return data;
         } catch (IOException e) {
             return null;
         }
