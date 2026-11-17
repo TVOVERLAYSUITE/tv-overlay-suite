@@ -30,7 +30,7 @@ final class TypePanel extends LinearLayout {
         void closePanel();
     }
 
-    static final int BG = 0xFF1B202A, FIELD = 0xFF252B38, TEXT = 0xFFE9ECF2, MUTED = 0xFF8A93A3, ACCENT = 0xFFFFD21F;
+    static final int BG = 0xFF1B202A, FIELD = 0xFF252B38, TEXT = 0xFFE9ECF2, MUTED = 0xFF8A93A3, ACCENT = 0xFFFFE135;
 
     private final Host host;
     private final Store store;

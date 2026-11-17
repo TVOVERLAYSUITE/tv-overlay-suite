@@ -28,7 +28,7 @@ import java.util.Locale;
 public class MainActivity extends Activity {
 
     private static final int BG = 0xFF0F1218, CARD = 0xFF1B202A, FIELD = 0xFF252B38, TEXT = 0xFFE9ECF2,
-            MUTED = 0xFF8A93A3, ACCENT = 0xFFFFD21F, GOOD = 0xFF45D483, WARN = 0xFFFF8A5F;
+            MUTED = 0xFF8A93A3, ACCENT = 0xFFFFE135, GOOD = 0xFF45D483, WARN = 0xFFFF8A5F;
     private static final String CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
     private Store store;

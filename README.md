@@ -1,5 +1,7 @@
 # TV Overlay Suite
 
+<img src="docs/banner.png" width="480" alt="tv overlay suite: scribble on your tv.">
+
 **Type on your Android TV / Google TV from your phone, as fast as you text.** Select any search box on the TV and a
 typing bar pops up on your phone, with your own phone keyboard: swipe typing, voice typing, autocorrect, paste. Every
 letter appears on the TV as you type it.
